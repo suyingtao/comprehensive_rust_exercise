@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-mod ffi {
+mod abc {
     use std::os::raw::{c_char, c_int, c_long, c_ulong, c_ushort};
 
     // Opaque type. See https://doc.rust-lang.org/nomicon/ffi.html.
