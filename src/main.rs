@@ -66,12 +66,17 @@ fn check_url(url: Url, checked_urls: &Arc<Mutex<HashSet<String>>>) -> Result<Vec
 
 fn main() {
     let checked_urls = Arc::new(Mutex::new(HashSet::new()));
-    let start_url = Url::parse("https://www.douyin.com").unwrap();
-    let valid_urls = check_url(start_url, &checked_urls).unwrap();
+    let start_url = Url::parse("https://www.baidu.com").unwrap();
+    let mut valid_urls = check_url(start_url, &checked_urls).unwrap();
+    let mut uniques = HashSet::new();
+    valid_urls.retain(|i| uniques.insert(i.to_string()));
+
+    println!("\n\n\n");
     for url in valid_urls {
         let s = url.as_str();
         println!("valid_url: {s}");
     }
+    println!("\n\n\n");
     for url in checked_urls.lock().unwrap().iter() {
         println!("checked_url: {url}");
     }
