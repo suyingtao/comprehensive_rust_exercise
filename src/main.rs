@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use reqwest::blocking::{get, Response};
 use reqwest::Url;
@@ -31,7 +32,8 @@ fn extract_links(response: Response) -> Result<Vec<Url>, Error> {
     Ok(valid_urls)
 }
 
-fn check_url(url: Url) -> Result<Vec<Url>, Error> {
+fn check_url(url: Url, checked_urls: &Arc<Mutex<HashSet<String>>>) -> Result<Vec<Url>, Error> {
+    checked_urls.lock().unwrap().insert(url.to_string());
     let s = url.to_string();
     println!("start check: {s}");
     let response = get(url.to_owned()).unwrap();
@@ -39,14 +41,17 @@ fn check_url(url: Url) -> Result<Vec<Url>, Error> {
     let valid_urls = Arc::new(Mutex::new(Vec::new()));
     let mut handles = Vec::new();
     for link in valid_links {
+        let checked_urls_clone = Arc::clone(&checked_urls.clone());
         let valid_urls = valid_urls.clone();
         let link_str = link.to_string();
         if link.domain() == url.domain() {
             println!("same domain {link_str} and {s}");
-            handles.push(thread::spawn(move || {
-                let r = check_url(link).unwrap();
-                valid_urls.lock().unwrap().extend(r);
-            }));
+            if !checked_urls_clone.lock().unwrap().contains(&link.to_string()) {
+                handles.push(thread::spawn(move || {
+                    let r = check_url(link, &checked_urls_clone).unwrap();
+                    valid_urls.lock().unwrap().extend(r);
+                }));
+            }
         } else {
             println!("not same domain {link_str} and {s}");
             valid_urls.lock().unwrap().push(link);
@@ -60,43 +65,14 @@ fn check_url(url: Url) -> Result<Vec<Url>, Error> {
 }
 
 fn main() {
-    let start_url = Url::parse("https://www.google.com").unwrap();
-    let valid_urls = check_url(start_url).unwrap();
+    let checked_urls = Arc::new(Mutex::new(HashSet::new()));
+    let start_url = Url::parse("https://www.douyin.com").unwrap();
+    let valid_urls = check_url(start_url, &checked_urls).unwrap();
     for url in valid_urls {
         let s = url.as_str();
-        println!("{s}");
+        println!("valid_url: {s}");
+    }
+    for url in checked_urls.lock().unwrap().iter() {
+        println!("checked_url: {url}");
     }
 }
-
-
-
-// fn extract_links_parallel(response: Response) -> Result<Vec<Url>, Error> {
-//     let base_url = response.url().to_owned();
-//     let document = response.text()?;
-//     let html = Html::parse_document(&document);
-//     let selector = Selector::parse("a").unwrap();
-//     let valid_urls = Arc::new(Mutex::new(Vec::new()));
-//     let mut handles = vec![];
-//     for element in html.select(&selector) {
-//         let valid_urls = valid_urls.clone();
-//         let href = element.value().attr("href").unwrap().to_string().clone();
-//         let base_url = base_url.clone();
-//         let handle = thread::spawn(move || {
-//             let href = href.as_str();
-//             match base_url.join(href) {
-//                 Ok(url) => {
-//                     valid_urls.lock().unwrap().push(url);
-//                 },
-//                 Err(err) => {
-//                     println!("On {base_url}: could not parse {href:?}: {err} (ignored)");
-//                 }
-//             }
-//         });
-//         handles.push(handle);
-//     }
-//     for i in handles {
-//         i.join().unwrap();
-//     }
-//     let v = valid_urls.lock().unwrap().clone();
-//     Ok(v)
-// }
